@@ -11,11 +11,11 @@ No notebooks — plain Python scripts you run from the terminal.
 | Piece | Details |
 |--------|---------|
 | **Goal** | Classify each match as H / D / A before kickoff |
-| **Data** | `data/raw/matches.csv` (~1,389 team-rows, seasons 2020–22) |
+| **Data** | `data/raw/results.csv` (~11k matches, seasons 1993–94 → 2021–22) |
 | **Approach** | Clean data → baseline → features → train model → evaluate → predict |
-| **Hard rule** | Only use info known **before** the match (no same-game goals/xG/shots) |
+| **Hard rule** | Only use info known **before** the match (no same-game goals/shots) |
 
-Raw rows are one team’s view of a game. Each fixture appears twice; we merge into **one row per match** before modeling.
+Raw data is already **one row per fixture** (home team, away team, full-time score/result).
 
 ---
 
@@ -23,7 +23,7 @@ Raw rows are one team’s view of a game. Each fixture appears twice; we merge i
 
 ```
 data/
-  raw/matches.csv       # original data — do not edit
+  raw/results.csv       # original data — do not edit
   processed/            # cleaned / feature tables we write
 src/                    # library code (importable functions)
   data.py               # load & clean
@@ -31,56 +31,14 @@ src/                    # library code (importable functions)
   model.py              # train / evaluate / save
   predict.py            # score a single fixture
 scripts/                # things you run from the terminal
-  explore.py            # print data summaries
-  prepare_data.py       # raw → processed matches
-  train.py              # train + evaluate
-  predict_match.py      # CLI: predict Home vs Away
+  explore.py
+  prepare_data.py
+  build_features.py
+  train.py
+  predict_match.py
 requirements.txt
 README.md
 ```
-
-- **`src/`** = reusable logic  
-- **`scripts/`** = entry points (`python scripts/train.py`)
-
----
-
-## Build plan (do in order)
-
-### Phase 1 — Understand the data
-- Run exploration: shape, date range, teams, result balance
-- Confirm home/away pairing works
-- **Deliverable:** `scripts/explore.py`
-
-### Phase 2 — Clean into match-level table
-- Merge home + away rows → one fixture per row
-- Columns like: `date`, `home_team`, `away_team`, `home_goals`, `away_goals`, `result`
-- Save to `data/processed/matches.csv`
-- **Deliverable:** `src/data.py` + `scripts/prepare_data.py`
-
-### Phase 3 — Baseline (no ML yet)
-- Always predict “Home win”
-- Score with a **time-based** split (train on earlier games, test on later)
-- This is the score every real model must beat
-- **Deliverable:** printed baseline accuracy in `scripts/train.py` (or a small baseline step)
-
-### Phase 4 — Features
-- Rolling form (e.g. points / GD last 5 games)
-- Optional: Elo ratings, season standing so far
-- Still only pre-match info
-- Save feature table if useful: `data/processed/features.csv`
-- **Deliverable:** `src/features.py`
-
-### Phase 5 — Train a model
-- Start with **logistic regression** (simple, readable)
-- Later try Random Forest if you want
-- Time-based train/test (never shuffle randomly for football)
-- Metrics: accuracy vs baseline, confusion matrix, maybe log loss
-- **Deliverable:** `src/model.py` + `scripts/train.py`
-
-### Phase 6 — Predict
-- CLI: `python scripts/predict_match.py "Arsenal" "Chelsea"`
-- Print H / D / A probabilities
-- **Deliverable:** `src/predict.py` + `scripts/predict_match.py`
 
 ---
 
@@ -93,9 +51,12 @@ pip install -r requirements.txt
 
 python scripts/explore.py
 python scripts/prepare_data.py
+python scripts/build_features.py
 python scripts/train.py
 python scripts/predict_match.py "Arsenal" "Chelsea"
 ```
+
+Predictions use each team’s form/Elo **as of the last date in the dataset**. Refresh `data/raw/results.csv` and re-run prepare → features → train to update.
 
 ---
 

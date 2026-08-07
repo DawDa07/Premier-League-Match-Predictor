@@ -1,4 +1,4 @@
-"""Phase 1: explore the raw Premier League match data."""
+"""Explore the raw Premier League results data."""
 
 import sys
 from pathlib import Path
@@ -21,32 +21,26 @@ def main() -> None:
     print()
 
     print("=== Date range ===")
-    print(f"{df['date'].min().date()} → {df['date'].max().date()}")
-    print()
-
-    print("=== Competition ===")
-    print(df["comp"].value_counts().to_string())
+    print(f"{df['DateTime'].min().date()} → {df['DateTime'].max().date()}")
     print()
 
     print("=== Seasons ===")
-    print(df["season"].value_counts().sort_index().to_string())
+    print(f"Count: {df['Season'].nunique()}")
+    print(f"First: {df['Season'].iloc[0]}  Last: {df['Season'].iloc[-1]}")
     print()
 
-    print("=== Venue ===")
-    print(df["venue"].value_counts().to_string())
+    print("=== Full-time result (H / D / A) ===")
+    print(df["FTR"].value_counts().reindex(["H", "D", "A"]).to_string())
     print()
 
-    print("=== Result (from each team's view: W / D / L) ===")
-    print(df["result"].value_counts().to_string())
-    print()
-
+    teams = sorted(set(df["HomeTeam"]) | set(df["AwayTeam"]))
     print("=== Teams ===")
-    print(f"Unique teams: {df['team'].nunique()}")
-    print(df["team"].value_counts().sort_index().to_string())
+    print(f"Unique teams: {len(teams)}")
+    print(", ".join(teams))
     print()
 
     print("=== Sample rows ===")
-    cols = ["date", "team", "venue", "opponent", "result", "gf", "ga", "season"]
+    cols = ["Season", "DateTime", "HomeTeam", "AwayTeam", "FTHG", "FTAG", "FTR"]
     print(df[cols].head(8).to_string(index=False))
     print()
 
@@ -56,12 +50,7 @@ def main() -> None:
     if missing.empty:
         print("None")
     else:
-        print(missing.to_string())
-    print()
-
-    print("=== Note ===")
-    print("Each match appears twice (home row + away row).")
-    print("Next: merge into one row per fixture (Phase 2).")
+        print(missing.head(12).to_string())
 
 
 if __name__ == "__main__":

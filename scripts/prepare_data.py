@@ -1,4 +1,4 @@
-"""Phase 2: clean raw team-rows into one row per match."""
+"""Clean raw results into one row per match."""
 
 import sys
 from pathlib import Path
@@ -23,8 +23,8 @@ def main() -> None:
     print(matches["result"].value_counts().reindex(["H", "D", "A"]).to_string())
     print()
 
-    print("=== By season ===")
-    print(matches["season"].value_counts().sort_index().to_string())
+    print("=== Seasons ===")
+    print(f"{matches['season'].nunique()} seasons  ({matches['season'].iloc[0]} → {matches['season'].iloc[-1]})")
     print()
 
     print("=== Sample ===")
@@ -32,7 +32,7 @@ def main() -> None:
     print(matches[cols].head(10).to_string(index=False))
     print()
 
-    print(f"Next: Phase 3 — baseline model (always predict home win) via scripts/train.py")
+    print(f"Next: python scripts/build_features.py")
     print(f"(processed file ready at {PROCESSED_MATCHES.relative_to(ROOT)})")
 
 
