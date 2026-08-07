@@ -1,4 +1,4 @@
-"""Phase 5: train logistic regression and compare to the always-home baseline."""
+"""Train candidate models, compare to baseline, save the best."""
 
 import sys
 from pathlib import Path
@@ -25,12 +25,22 @@ from src.model import (
     train_model,
 )
 
+CANDIDATES = [
+    ("logistic", "Logistic regression"),
+    ("random_forest", "Random forest"),
+    ("hist_gradient_boosting", "Hist gradient boosting"),
+]
+
 
 def load_or_build_features():
-    if PROCESSED_FEATURES.exists():
-        return load_features()
     if not PROCESSED_MATCHES.exists():
         save_matches(build_matches())
+
+    if PROCESSED_FEATURES.exists():
+        featured = load_features()
+        if set(FEATURE_COLUMNS).issubset(featured.columns):
+            return featured
+
     featured = add_features(load_processed())
     save_features(featured)
     return featured
@@ -41,12 +51,7 @@ def main() -> None:
     train, test = time_based_split(data, train_ratio=0.8)
 
     y_test = test["result"]
-    baseline_pred = baseline_always_home(len(test))
-    baseline_acc = accuracy(y_test, baseline_pred)
-
-    model = train_model(train)
-    metrics = evaluate_model(model, test)
-    path = save_model(model)
+    baseline_acc = accuracy(y_test, baseline_always_home(len(test)))
 
     print("=== Time-based split (80% train / 20% test) ===")
     print(f"Train: {len(train):,}  ({train['date'].min().date()} → {train['date'].max().date()})")
@@ -62,23 +67,35 @@ def main() -> None:
     print(f"Accuracy: {baseline_acc:.1%}")
     print()
 
-    print("=== Logistic regression ===")
-    print(f"Accuracy: {metrics['accuracy']:.1%}")
-    print(f"Log loss: {metrics['log_loss']:.3f}  (lower is better)")
-    delta = metrics["accuracy"] - baseline_acc
-    vs = "BEATS" if delta > 0 else "does not beat"
-    print(f"Vs baseline: {delta:+.1%} → {vs} the always-home baseline")
+    results = []
+    for key, label in CANDIDATES:
+        model = train_model(train, model_name=key)
+        metrics = evaluate_model(model, test)
+        results.append((key, label, model, metrics))
+        delta = metrics["accuracy"] - baseline_acc
+        print(f"=== {label} ===")
+        print(f"Accuracy: {metrics['accuracy']:.1%}")
+        print(f"Log loss: {metrics['log_loss']:.3f}  (lower is better)")
+        print(f"Vs baseline: {delta:+.1%}")
+        print()
+
+    # Prefer higher accuracy; break ties with lower log loss.
+    best_key, best_label, best_model, best_metrics = max(
+        results, key=lambda r: (r[3]["accuracy"], -r[3]["log_loss"])
+    )
+    path = save_model(best_model, model_name=best_key)
+
+    print(f"=== Winner: {best_label} ===")
+    print(f"Accuracy: {best_metrics['accuracy']:.1%}")
+    print(f"Log loss: {best_metrics['log_loss']:.3f}")
     print()
-
-    print("=== Classification report ===")
-    print(metrics["report"])
-
+    print("=== Classification report (winner) ===")
+    print(best_metrics["report"])
     print("=== Confusion matrix (rows=true, cols=pred) ===")
     print("labels:", LABELS)
-    print(metrics["confusion_matrix"])
+    print(best_metrics["confusion_matrix"])
     print()
-
-    print(f"Saved model → {path.relative_to(ROOT)}")
+    print(f"Saved model → {path.relative_to(ROOT)}  ({best_key})")
     print('Predict: python scripts/predict_match.py "Arsenal" "Chelsea"')
 
 

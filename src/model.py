@@ -1,4 +1,4 @@
-"""Train/eval helpers: baseline + logistic regression."""
+"""Train/eval helpers: baseline + candidate classifiers."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
+from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix, log_loss
 from sklearn.pipeline import Pipeline
@@ -63,32 +64,53 @@ def result_counts(results: pd.Series) -> pd.Series:
     return results.value_counts().reindex(LABELS).fillna(0).astype(int)
 
 
-def make_model() -> Pipeline:
-    """
-    Logistic regression with scaled features.
+def make_model(name: str = "logistic") -> Pipeline:
+    """Build a named classifier pipeline."""
+    name = name.lower().strip()
 
-    Scaling matters because Elo (~1500) and points (~0–15) live on
-    different numeric ranges; without it, Elo would dominate.
-    """
-    return Pipeline(
-        steps=[
-            ("scaler", StandardScaler()),
-            (
-                "clf",
-                LogisticRegression(
-                    max_iter=2000,
-                    class_weight="balanced",
-                    random_state=42,
-                ),
-            ),
-        ]
+    if name in {"logistic", "logreg", "lr"}:
+        clf = LogisticRegression(
+            max_iter=2000,
+            class_weight="balanced",
+            random_state=42,
+        )
+        # Scaling matters for linear models (Elo vs points scales).
+        return Pipeline([("scaler", StandardScaler()), ("clf", clf)])
+
+    if name in {"rf", "random_forest", "forest"}:
+        clf = RandomForestClassifier(
+            n_estimators=300,
+            max_depth=12,
+            min_samples_leaf=5,
+            class_weight="balanced_subsample",
+            random_state=42,
+            n_jobs=-1,
+        )
+        # Trees don't need scaling; keep a no-op-free pipeline for a common API.
+        return Pipeline([("clf", clf)])
+
+    if name in {"gbm", "hgb", "hist_gradient_boosting", "boosting"}:
+        clf = HistGradientBoostingClassifier(
+            max_depth=6,
+            learning_rate=0.05,
+            max_iter=300,
+            random_state=42,
+        )
+        return Pipeline([("clf", clf)])
+
+    raise ValueError(
+        f"Unknown model {name!r}. Choose: logistic, random_forest, hist_gradient_boosting"
     )
 
 
-def train_model(train: pd.DataFrame, feature_cols: list[str] = FEATURE_COLUMNS) -> Pipeline:
+def train_model(
+    train: pd.DataFrame,
+    feature_cols: list[str] = FEATURE_COLUMNS,
+    model_name: str = "logistic",
+) -> Pipeline:
     X = train[feature_cols]
     y = train["result"]
-    model = make_model()
+    model = make_model(model_name)
     model.fit(X, y)
     return model
 
@@ -115,10 +137,19 @@ def evaluate_model(
     }
 
 
-def save_model(model: Pipeline, path: Path = MODEL_PATH) -> Path:
+def save_model(
+    model: Pipeline,
+    path: Path = MODEL_PATH,
+    model_name: str = "logistic",
+) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(
-        {"model": model, "feature_columns": FEATURE_COLUMNS, "labels": LABELS},
+        {
+            "model": model,
+            "model_name": model_name,
+            "feature_columns": FEATURE_COLUMNS,
+            "labels": LABELS,
+        },
         path,
     )
     return path

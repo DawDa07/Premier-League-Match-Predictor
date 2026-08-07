@@ -96,7 +96,7 @@ def predict_match(
     feature_cols = bundle["feature_columns"]
 
     states = current_team_states(matches)
-    X = fixture_features(home, away, states)[feature_cols]
+    X = fixture_features(home, away, states, matches=matches)[feature_cols]
     pred = model.predict(X)[0]
     proba = model.predict_proba(X)[0]
     prob_by_class = dict(zip(model.classes_, proba))
